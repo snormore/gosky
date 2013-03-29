@@ -149,3 +149,13 @@ func (c *Client) DeleteTable(table *Table) error {
 	table.client = c
 	return c.send("DELETE", fmt.Sprintf("/tables/%s", table.Name), nil, nil)
 }
+
+//--------------------------------------
+// Utility API
+//--------------------------------------
+
+// Checks if the server is currently running and available.
+func (c *Client) Ping() (bool) {
+	err := c.send("GET", "/ping", nil, nil)
+	return err == nil
+}

@@ -154,7 +154,7 @@ func TestDeleteEvent(t *testing.T) {
 }
 
 //--------------------------------------
-// Event API
+// Query API
 //--------------------------------------
 
 // Ensure that we can replace an event into another one.

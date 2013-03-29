@@ -206,7 +206,7 @@ func (t *Table) DeleteEvent(objectId string, event *Event) error {
 }
 
 //--------------------------------------
-// Property API
+// Query API
 //--------------------------------------
 
 // Executes a query on the table.
@@ -223,3 +223,4 @@ func (t *Table) Query(q map[string]interface{}) (map[string]interface{}, error) 
 	}
 	return output, nil
 }
+
