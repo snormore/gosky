@@ -12,7 +12,7 @@ import (
 func TestCreateDeleteProperty(t *testing.T) {
 	run(t, func(client *Client, table *Table) {
 		property := NewProperty("purchase_price", true, String)
-		
+
 		// Create the property.
 		err := table.CreateProperty(property)
 		if err != nil {
@@ -59,6 +59,96 @@ func TestGetProperties(t *testing.T) {
 		p = properties[2]
 		if p.Id != 2 || p.Name != "name" || p.Transient || p.DataType != String {
 			t.Fatalf("Unable to get properties(2): %v (%v)", p, err)
+		}
+	})
+}
+
+//--------------------------------------
+// Event API
+//--------------------------------------
+
+// Ensure that we can replace an event into another one.
+func TestReplaceEvent(t *testing.T) {
+	run(t, func(client *Client, table *Table) {
+		timestamp, _ := ParseTimestamp("1970-01-01T00:00:01.5Z")
+		table.CreateProperty(NewProperty("p0", false, Factor))
+		table.CreateProperty(NewProperty("t0", true, Integer))
+		e0 := NewEvent(timestamp, map[string]interface{}{"p0": "foo", "t0": 10})
+		e1 := NewEvent(timestamp, map[string]interface{}{"t0": 20})
+
+		// Add the event.
+		err := table.AddEvent("o0", e0, Replace)
+		if err != nil {
+			t.Fatalf("Unable to replace event: %v (%v)", e0, err)
+		}
+
+		// Replace the event.
+		err = table.AddEvent("o0", e1, Replace)
+		if err != nil {
+			t.Fatalf("Unable to replace event: %v (%v)", e1, err)
+		}
+
+		// Get the event to verify.
+		event, err := table.GetEvent("o0", timestamp)
+		if err != nil || event.Data["t0"] != float64(20) || event.Data["p0"] != nil {
+			t.Fatalf("Incorrect replaced event: %v (%v)", event, err)
+		}
+	})
+}
+
+// Ensure that we can merge an event into another one.
+func TestMergeEvent(t *testing.T) {
+	run(t, func(client *Client, table *Table) {
+		timestamp, _ := ParseTimestamp("1970-01-01T00:00:01.5Z")
+		table.CreateProperty(NewProperty("p0", false, String))
+		table.CreateProperty(NewProperty("t0", true, Integer))
+		e0 := NewEvent(timestamp, map[string]interface{}{"p0": "foo", "t0": 10})
+		e1 := NewEvent(timestamp, map[string]interface{}{"t0": 20})
+
+		// Add the event.
+		err := table.AddEvent("o0", e0, Merge)
+		if err != nil {
+			t.Fatalf("Unable to merge event: %v (%v)", e0, err)
+		}
+
+		// Merge the event.
+		err = table.AddEvent("o0", e1, Merge)
+		if err != nil {
+			t.Fatalf("Unable to replace event: %v (%v)", e1, err)
+		}
+
+		// Get the event to verify.
+		event, err := table.GetEvent("o0", timestamp)
+		if err != nil || event.Data["t0"] != float64(20) || event.Data["p0"] != "foo" {
+			t.Fatalf("Incorrect merged event: %v (%v)", event, err)
+		}
+	})
+}
+
+// Ensure that we can delete an event.
+func TestDeleteEvent(t *testing.T) {
+	run(t, func(client *Client, table *Table) {
+		timestamp, _ := ParseTimestamp("1970-01-01T00:00:01.5Z")
+		table.CreateProperty(NewProperty("p0", false, String))
+		table.CreateProperty(NewProperty("t0", true, Integer))
+		e0 := NewEvent(timestamp, map[string]interface{}{"p0": "foo", "t0": 10})
+
+		// Add the event.
+		err := table.AddEvent("o0", e0, Merge)
+		if err != nil {
+			t.Fatalf("Unable to merge event: %v (%v)", e0, err)
+		}
+
+		// Delete the event.
+		err = table.DeleteEvent("o0", e0)
+		if err != nil {
+			t.Fatalf("Unable to delete event: %v (%v)", e0, err)
+		}
+
+		// Get the event to verify.
+		event, err := table.GetEvent("o0", timestamp)
+		if err != nil || event.Data["t0"] != nil || event.Data["p0"] != nil {
+			t.Fatalf("Incorrect deleted event: %v (%v)", event, err)
 		}
 	})
 }

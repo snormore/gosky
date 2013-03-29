@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 )
@@ -88,7 +89,7 @@ func (c *Client) send(method string, path string, data interface{}, ret interfac
 	if resp.StatusCode != http.StatusOK {
 		h := make(map[string]interface{})
 		err := json.NewDecoder(resp.Body).Decode(h)
-		if message, ok := h["message"].(string); err == nil && ok {
+		if message, ok := h["message"].(string); (err == nil || err == io.EOF) && ok {
 			return NewError(message)
 		} else {
 			return NewError(fmt.Sprintf("sky.Error: \"%s %s\" [%d]", method, url, resp.StatusCode))
@@ -98,7 +99,7 @@ func (c *Client) send(method string, path string, data interface{}, ret interfac
 	// Deserialize data into return object if we have one.
 	if ret != nil {
 		err := json.NewDecoder(resp.Body).Decode(ret)
-		if err != nil {
+		if err != nil && err != io.EOF {
 			return err
 		}
 	}
