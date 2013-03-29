@@ -169,7 +169,7 @@ func TestSimpleCountQuery(t *testing.T) {
 		table.AddEvent("o0", NewEvent(t2, map[string]interface{}{"action": "A2"}), Replace)
 
 		// Run a simple count query.
-		results, err := table.Query(map[string]interface{}{
+		results, err := table.RawQuery(map[string]interface{}{
 			"steps":[]map[string]interface{}{
 				map[string]interface{}{
 					"type":"selection",

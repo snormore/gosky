@@ -209,8 +209,8 @@ func (t *Table) DeleteEvent(objectId string, event *Event) error {
 // Query API
 //--------------------------------------
 
-// Executes a query on the table.
-func (t *Table) Query(q map[string]interface{}) (map[string]interface{}, error) {
+// Executes a raw query on the table.
+func (t *Table) RawQuery(q map[string]interface{}) (map[string]interface{}, error) {
 	if t.client == nil {
 		return nil, errors.New("Table is not attached to a client")
 	}
