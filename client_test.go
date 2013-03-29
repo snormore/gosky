@@ -4,22 +4,24 @@ import (
 	"testing"
 )
 
-// Ensure that we create and delete a table.
-func TestCreateDeleteTable(t *testing.T) {
-	client := setup(t)
-	table := NewTable(testTableName)
+// Ensure that we can retrieve a single table.
+func TestGetTable(t *testing.T) {
+	run(t, func(client *Client) {
+		table, err := client.GetTable("sky-go-integration")
+		if err != nil || table == nil || table.Name != "sky-go-integration" {
+			t.Fatalf("Unable to get table: %v (%v)", table, err)
+		}
+	})
+}
 
-	// Create the table.
-	err := client.CreateTable(table)
-	if err != nil {
-		t.Fatalf("Unable to create table: %v", err)
-	}
-
-	// Delete the table.
-	err = client.DeleteTable(table)
-	if err != nil {
-		t.Fatalf("Unable to delete table: %v", err)
-	}
+// Ensure that we retrieve a list of all tables.
+func TestGetTables(t *testing.T) {
+	run(t, func(client *Client) {
+		tables, err := client.GetTables()
+		if err != nil || len(tables) == 0 {
+			t.Fatalf("Unable to get tables: %d (%v)", tables, err)
+		}
+	})
 }
 
 

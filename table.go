@@ -18,8 +18,9 @@ type Table struct {
 //
 //------------------------------------------------------------------------------
 
-func NewTable(name string) *Table {
+func NewTable(name string, client *Client) *Table {
 	return &Table{
 		Name:    name,
+		client:    client,
 	}
 }
