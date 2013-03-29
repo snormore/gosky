@@ -152,3 +152,38 @@ func TestDeleteEvent(t *testing.T) {
 		}
 	})
 }
+
+//--------------------------------------
+// Event API
+//--------------------------------------
+
+// Ensure that we can replace an event into another one.
+func TestSimpleCountQuery(t *testing.T) {
+	run(t, func(client *Client, table *Table) {
+		table.CreateProperty(NewProperty("action", false, Factor))
+		t0, _ := ParseTimestamp("1970-01-01T00:00:00Z")
+		t1, _ := ParseTimestamp("1970-01-01T00:00:01Z")
+		t2, _ := ParseTimestamp("1970-01-01T00:00:01.5Z")
+		table.AddEvent("o0", NewEvent(t0, map[string]interface{}{"action": "A0"}), Replace)
+		table.AddEvent("o0", NewEvent(t1, map[string]interface{}{"action": "A1"}), Replace)
+		table.AddEvent("o0", NewEvent(t2, map[string]interface{}{"action": "A2"}), Replace)
+
+		// Run a simple count query.
+		results, err := table.Query(map[string]interface{}{
+			"steps":[]map[string]interface{}{
+				map[string]interface{}{
+					"type":"selection",
+					"fields":[]map[string]interface{}{
+						map[string]interface{}{
+							"name":"count",
+							"expression":"count()",
+						},
+					},
+				},
+			},
+		})
+		if err != nil || results["count"] != float64(3) {
+			t.Fatalf("Query failed: %v (%v)", results, err)
+		}
+	})
+}

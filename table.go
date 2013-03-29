@@ -204,3 +204,22 @@ func (t *Table) DeleteEvent(objectId string, event *Event) error {
 	}
 	return t.client.send("DELETE", fmt.Sprintf("/tables/%s/objects/%s/events/%s", t.Name, objectId, FormatTimestamp(event.Timestamp)), nil, nil)
 }
+
+//--------------------------------------
+// Property API
+//--------------------------------------
+
+// Executes a query on the table.
+func (t *Table) Query(q map[string]interface{}) (map[string]interface{}, error) {
+	if t.client == nil {
+		return nil, errors.New("Table is not attached to a client")
+	}
+	if q == nil {
+		return nil, errors.New("Query required")
+	}
+	output := map[string]interface{}{}
+	if err := t.client.send("POST", fmt.Sprintf("/tables/%s/query", t.Name), q, &output); err != nil {
+		return nil, err
+	}
+	return output, nil
+}
