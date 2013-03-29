@@ -9,19 +9,18 @@ const (
 )
 
 // Setup the test environment.
-func run(t *testing.T, f func(*Client)) {
+func run(t *testing.T, f func(*Client, *Table)) {
 	client := NewClient("localhost")
 	client.DeleteTable(NewTable(testTableName, nil))
-	
+
 	// Create the table.
-	err := client.CreateTable(NewTable(testTableName, nil))
+	table := NewTable(testTableName, nil)
+	err := client.CreateTable(table)
 	if err != nil {
 		t.Fatalf("Unable to setup test table: %v", err)
 	}
 
-	f(client)
+	f(client, table)
 
 	client.DeleteTable(NewTable(testTableName, nil))
 }
-
-

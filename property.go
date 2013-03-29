@@ -2,13 +2,30 @@ package sky
 
 //------------------------------------------------------------------------------
 //
+// Constants
+//
+//------------------------------------------------------------------------------
+
+const (
+	String  = "string"
+	Integer = "integer"
+	Float   = "float"
+	Boolean = "boolean"
+	Factor  = "factor"
+)
+
+//------------------------------------------------------------------------------
+//
 // Typedefs
 //
 //------------------------------------------------------------------------------
 
-// An error generated from the Sky server.
-type Error struct {
-	message string
+// A Property is part of the table's schema.
+type Property struct {
+	Id        int    `json:"id"`
+	Name      string `json:"name"`
+	Transient bool   `json:"transient"`
+	DataType  string `json:"dataType"`
 }
 
 //------------------------------------------------------------------------------
@@ -17,18 +34,10 @@ type Error struct {
 //
 //------------------------------------------------------------------------------
 
-// NewError creates a new Sky error object.
-func NewError(message string) *Error {
-	return &Error{message: message}
-}
-
-//------------------------------------------------------------------------------
-//
-// Methods
-//
-//------------------------------------------------------------------------------
-
-// The error message.
-func (e *Error) Error() string {
-	return e.message
+func NewProperty(name string, transient bool, dataType string) *Property {
+	return &Property{
+		Name:      name,
+		Transient: transient,
+		DataType:  dataType,
+	}
 }

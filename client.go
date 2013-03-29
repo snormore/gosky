@@ -26,8 +26,8 @@ const (
 
 // A Client is what communicates command to the server.
 type Client struct {
-	Host string
-	Port int
+	Host       string
+	Port       int
 	httpClient *http.Client
 }
 
@@ -39,8 +39,8 @@ type Client struct {
 
 func NewClient(host string) *Client {
 	return &Client{
-		Host:    host,
-		Port: DefaultPort,
+		Host:       host,
+		Port:       DefaultPort,
 		httpClient: &http.Client{},
 	}
 }
@@ -56,7 +56,7 @@ func NewClient(host string) *Client {
 //--------------------------------------
 
 // Creates a table on the server.
-func (c *Client) send(method string, path string, data interface{}, ret interface{}) (error) {
+func (c *Client) send(method string, path string, data interface{}, ret interface{}) error {
 	// Create the URL.
 	url := fmt.Sprintf("http://%s:%d%s", c.Host, c.Port, path)
 
@@ -76,14 +76,14 @@ func (c *Client) send(method string, path string, data interface{}, ret interfac
 		return err
 	}
 	req.Header.Add("Content-Type", "application/json")
-	
+
 	// Send the request to the server.
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()	
-	
+	defer resp.Body.Close()
+
 	// If we have a return object then deserialize to it.
 	if resp.StatusCode != http.StatusOK {
 		h := make(map[string]interface{})
@@ -102,7 +102,7 @@ func (c *Client) send(method string, path string, data interface{}, ret interfac
 			return err
 		}
 	}
-	
+
 	return nil
 }
 
@@ -146,6 +146,5 @@ func (c *Client) DeleteTable(table *Table) error {
 		return errors.New("Table required")
 	}
 	table.client = c
-	return c.send("DELETE", fmt.Sprintf("/tables/%s", table.Name), table, nil)
+	return c.send("DELETE", fmt.Sprintf("/tables/%s", table.Name), nil, nil)
 }
-
