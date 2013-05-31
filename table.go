@@ -3,12 +3,13 @@ package sky
 import (
 	"errors"
 	"fmt"
+	"net/http"
 	"time"
 )
 
 //------------------------------------------------------------------------------
 //
-// Constants
+// Globals
 //
 //------------------------------------------------------------------------------
 
@@ -166,9 +167,6 @@ func (t *Table) GetEvents(objectId string) ([]*Event, error) {
 
 // Adds an event to an object.
 func (t *Table) AddEvent(objectId string, event *Event, method string) error {
-	if t.client == nil {
-		return errors.New("Table is not attached to a client")
-	}
 	if objectId == "" {
 		return errors.New("Object identifier required")
 	}
@@ -177,14 +175,9 @@ func (t *Table) AddEvent(objectId string, event *Event, method string) error {
 	}
 
 	// Determine correct HTTP method.
-	var httpMethod string
-	switch method {
-	case Replace:
-		httpMethod = "PUT"
-	case Merge:
-		httpMethod = "PATCH"
-	default:
-		return fmt.Errorf("Invalid add event method: %s", method)
+	httpMethod, err := getInsertHttpMethod(method)
+	if err != nil {
+		return err
 	}
 
 	// Serialize data and send to server.
@@ -205,9 +198,75 @@ func (t *Table) DeleteEvent(objectId string, event *Event) error {
 	return t.client.send("DELETE", fmt.Sprintf("/tables/%s/objects/%s/events/%s", t.Name, objectId, FormatTimestamp(event.Timestamp)), nil, nil)
 }
 
+// Streams
+func (t *Table) Stream(f func(*EventStream)) error {
+	// Send the HTTP request with the reader.
+	stream := NewEventStream()
+	req, err := http.NewRequest("PATCH", t.client.PathUrl("/tables/benchmark/events"), stream.reader)
+	if err != nil {
+		return err
+	}
+	req.Header.Add("Content-Type", "application/json")
+
+	// Send the request to the server.
+	finished := make(chan interface{})
+	go func() {
+		resp, err := t.client.httpClient.Do(req)
+		if err != nil {
+			finished <- err
+		} else {
+			finished <- resp
+		}
+	}()
+
+	// Yield to processing function.
+	f(stream)
+
+	// Close the stream.
+	stream.writer.Close()
+	ret := <-finished
+	stream.reader.Close()
+
+	// Check if the client errored out and return the error appropriately.
+	if resp, ok := ret.(*http.Response); ok {
+		defer resp.Body.Close()
+
+		if resp.StatusCode != 200 {
+			return fmt.Errorf("Stream error: %d", resp.StatusCode)
+		}
+		return nil
+	} else if err, ok := ret.(error); ok {
+		return err
+	}
+	return nil
+}
+
+// Determines the appropriate HTTP method to use given an insertion method (Replace, Merge).
+func getInsertHttpMethod(method string) (string, error) {
+	switch method {
+	case Replace:
+		return "PUT", nil
+	case Merge:
+		return "PATCH", nil
+	}
+	return "", fmt.Errorf("Invalid add event method: %s", method)
+}
+
 //--------------------------------------
 // Query API
 //--------------------------------------
+
+// Retrieves basic stats on the table.
+func (t *Table) Stats() (*Stats, error) {
+	if t.client == nil {
+		return nil, errors.New("Table is not attached to a client")
+	}
+	output := &Stats{}
+	if err := t.client.send("GET", fmt.Sprintf("/tables/%s/stats", t.Name), nil, &output); err != nil {
+		return nil, err
+	}
+	return output, nil
+}
 
 // Executes a raw query on the table.
 func (t *Table) RawQuery(q map[string]interface{}) (map[string]interface{}, error) {

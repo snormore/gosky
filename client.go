@@ -28,7 +28,7 @@ const (
 // A Client is what communicates command to the server.
 type Client struct {
 	Host       string
-	Port       int
+	Port       uint
 	httpClient *http.Client
 }
 
@@ -57,9 +57,13 @@ func NewClient(host string) *Client {
 //--------------------------------------
 
 // Creates a table on the server.
+func (c *Client) PathUrl(path string) string {
+	return fmt.Sprintf("http://%s:%d%s", c.Host, c.Port, path)
+}
+
+// Creates a table on the server.
 func (c *Client) send(method string, path string, data interface{}, ret interface{}) error {
-	// Create the URL.
-	url := fmt.Sprintf("http://%s:%d%s", c.Host, c.Port, path)
+	url := c.PathUrl(path)
 
 	// Convert the data to JSON.
 	var err error

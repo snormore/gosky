@@ -1,6 +1,8 @@
 package sky
 
 import (
+	"fmt"
+	"os"
 	"testing"
 )
 
@@ -27,3 +29,8 @@ func run(t *testing.T, f func(*Client, *Table)) {
 
 	client.DeleteTable(NewTable(testTableName, nil))
 }
+
+func warn(msg string, v ...interface{}) {
+	fmt.Fprintf(os.Stderr, msg+"\n", v...)
+}
+
