@@ -202,7 +202,7 @@ func (t *Table) DeleteEvent(objectId string, event *Event) error {
 func (t *Table) Stream(f func(*EventStream)) error {
 	// Send the HTTP request with the reader.
 	stream := NewEventStream()
-	req, err := http.NewRequest("PATCH", t.client.PathUrl("/tables/benchmark/events"), stream.reader)
+	req, err := http.NewRequest("PATCH", t.client.PathUrl(fmt.Sprintf("/tables/%s/events", t.Name)), stream.reader)
 	if err != nil {
 		return err
 	}
