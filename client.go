@@ -9,61 +9,64 @@ import (
 	"strings"
 )
 
-//------------------------------------------------------------------------------
-//
-// Constants
-//
-//------------------------------------------------------------------------------
-
 const (
 	DefaultPort = 8585
 )
 
-//------------------------------------------------------------------------------
-//
-// Typedefs
-//
-//------------------------------------------------------------------------------
+// A Client is what communicates with the server.
+type Client interface {
+	// Retrieves a single table from the server.
+	GetTable(name string) (*Table, error)
 
-// A Client is what communicates command to the server.
-type Client struct {
+	// Retrieves a list of all tables on the server.
+	GetTables() ([]*Table, error)
+
+	// Creates a table on the server.
+	CreateTable(table *Table) error
+
+	// Deletes a table on the server.
+	DeleteTable(table *Table) error
+	
+	// Checks if the server is currently running and available.
+	Ping() bool
+
+	// Sends and receives raw data sent to a URL path.
+	Send(method string, path string, data interface{}, ret interface{}) error
+
+	// Constructs a URL based on the client's host, port and a given path.
+	URL(path string) string
+
+	// The HTTP client used by the client.
+	HTTPClient() *http.Client
+}
+
+type client struct {
 	Host       string
 	Port       uint
 	httpClient *http.Client
 }
 
-//------------------------------------------------------------------------------
-//
-// Constructor
-//
-//------------------------------------------------------------------------------
-
-func NewClient(host string) *Client {
-	return &Client{
+func NewClient(host string) Client {
+	return &client{
 		Host:       host,
 		Port:       DefaultPort,
 		httpClient: &http.Client{},
 	}
 }
 
-//------------------------------------------------------------------------------
-//
-// Methods
-//
-//------------------------------------------------------------------------------
+// The HTTP client.
+func (c *client) HTTPClient() *http.Client {
+	return c.httpClient
+}
 
-//--------------------------------------
-// HTTP
-//--------------------------------------
-
-// Creates a table on the server.
-func (c *Client) PathUrl(path string) string {
+// Constructs a URL based on the client's host, port and a given path.
+func (c *client) URL(path string) string {
 	return fmt.Sprintf("http://%s:%d%s", c.Host, c.Port, path)
 }
 
-// Creates a table on the server.
-func (c *Client) send(method string, path string, data interface{}, ret interface{}) error {
-	url := c.PathUrl(path)
+// Sends low-level data to and from the server.
+func (c *client) Send(method string, path string, data interface{}, ret interface{}) error {
+	url := c.URL(path)
 
 	// Convert the data to JSON.
 	var err error
@@ -111,55 +114,42 @@ func (c *Client) send(method string, path string, data interface{}, ret interfac
 	return nil
 }
 
-//--------------------------------------
-// Table API
-//--------------------------------------
-
-// Retrieves a single table from the server.
-func (c *Client) GetTable(name string) (*Table, error) {
+func (c *client) GetTable(name string) (*Table, error) {
 	if name == "" {
 		return nil, errors.New("Table name required")
 	}
 	table := NewTable("", c)
-	if err := c.send("GET", fmt.Sprintf("/tables/%s", name), nil, table); err != nil {
+	if err := c.Send("GET", fmt.Sprintf("/tables/%s", name), nil, table); err != nil {
 		return nil, err
 	}
 	return table, nil
 }
 
-// Retrieves a list of all tables on the server.
-func (c *Client) GetTables() ([]*Table, error) {
+func (c *client) GetTables() ([]*Table, error) {
 	tables := []*Table{}
-	if err := c.send("GET", "/tables", nil, &tables); err != nil {
+	if err := c.Send("GET", "/tables", nil, &tables); err != nil {
 		return nil, err
 	}
 	return tables, nil
 }
 
-// Creates a table on the server.
-func (c *Client) CreateTable(table *Table) error {
+func (c *client) CreateTable(table *Table) error {
 	if table == nil {
 		return errors.New("Table required")
 	}
 	table.client = c
-	return c.send("POST", "/tables", table, table)
+	return c.Send("POST", "/tables", table, table)
 }
 
-// Deletes a table on the server.
-func (c *Client) DeleteTable(table *Table) error {
+func (c *client) DeleteTable(table *Table) error {
 	if table == nil {
 		return errors.New("Table required")
 	}
 	table.client = c
-	return c.send("DELETE", fmt.Sprintf("/tables/%s", table.Name), nil, nil)
+	return c.Send("DELETE", fmt.Sprintf("/tables/%s", table.Name), nil, nil)
 }
 
-//--------------------------------------
-// Utility API
-//--------------------------------------
-
-// Checks if the server is currently running and available.
-func (c *Client) Ping() (bool) {
-	err := c.send("GET", "/ping", nil, nil)
+func (c *client) Ping() bool {
+	err := c.Send("GET", "/ping", nil, nil)
 	return err == nil
 }

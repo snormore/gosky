@@ -26,7 +26,7 @@ const (
 
 // A Table is a container for objects and events.
 type Table struct {
-	client *Client
+	client Client
 	Name   string `json:"name"`
 }
 
@@ -36,7 +36,7 @@ type Table struct {
 //
 //------------------------------------------------------------------------------
 
-func NewTable(name string, client *Client) *Table {
+func NewTable(name string, client Client) *Table {
 	return &Table{
 		Name:   name,
 		client: client,
@@ -62,7 +62,7 @@ func (t *Table) GetProperty(name string) (*Property, error) {
 		return nil, errors.New("Property name required")
 	}
 	property := &Property{}
-	if err := t.client.send("GET", fmt.Sprintf("/tables/%s/properties/%s", t.Name, name), nil, property); err != nil {
+	if err := t.client.Send("GET", fmt.Sprintf("/tables/%s/properties/%s", t.Name, name), nil, property); err != nil {
 		return nil, err
 	}
 	return property, nil
@@ -74,7 +74,7 @@ func (t *Table) GetProperties() ([]*Property, error) {
 		return nil, errors.New("Table is not attached to a client")
 	}
 	properties := []*Property{}
-	if err := t.client.send("GET", fmt.Sprintf("/tables/%s/properties", t.Name), nil, &properties); err != nil {
+	if err := t.client.Send("GET", fmt.Sprintf("/tables/%s/properties", t.Name), nil, &properties); err != nil {
 		return nil, err
 	}
 	return properties, nil
@@ -88,7 +88,7 @@ func (t *Table) CreateProperty(property *Property) error {
 	if property == nil {
 		return errors.New("Property required")
 	}
-	return t.client.send("POST", fmt.Sprintf("/tables/%s/properties", t.Name), property, property)
+	return t.client.Send("POST", fmt.Sprintf("/tables/%s/properties", t.Name), property, property)
 }
 
 // Updates a property on the table.
@@ -102,7 +102,7 @@ func (t *Table) UpdateProperty(name string, property *Property) error {
 	if property == nil {
 		return errors.New("Property required")
 	}
-	return t.client.send("PATCH", fmt.Sprintf("/tables/%s/properties/%s", t.Name, name), property, property)
+	return t.client.Send("PATCH", fmt.Sprintf("/tables/%s/properties/%s", t.Name, name), property, property)
 }
 
 // Deletes a property on the table.
@@ -113,7 +113,7 @@ func (t *Table) DeleteProperty(property *Property) error {
 	if property == nil {
 		return errors.New("Property required")
 	}
-	return t.client.send("DELETE", fmt.Sprintf("/tables/%s/properties/%s", t.Name, property.Name), nil, nil)
+	return t.client.Send("DELETE", fmt.Sprintf("/tables/%s/properties/%s", t.Name, property.Name), nil, nil)
 }
 
 //--------------------------------------
@@ -130,7 +130,7 @@ func (t *Table) GetEvent(objectId string, timestamp time.Time) (*Event, error) {
 	}
 
 	e := map[string]interface{}{}
-	if err := t.client.send("GET", fmt.Sprintf("/tables/%s/objects/%s/events/%s", t.Name, objectId, FormatTimestamp(timestamp)), nil, &e); err != nil {
+	if err := t.client.Send("GET", fmt.Sprintf("/tables/%s/objects/%s/events/%s", t.Name, objectId, FormatTimestamp(timestamp)), nil, &e); err != nil {
 		return nil, err
 	}
 
@@ -151,7 +151,7 @@ func (t *Table) GetEvents(objectId string) ([]*Event, error) {
 		return nil, errors.New("Object identifier required")
 	}
 	output := make([]map[string]interface{}, 0)
-	if err := t.client.send("GET", fmt.Sprintf("/tables/%s/objects/%s/events", t.Name, objectId), nil, &output); err != nil {
+	if err := t.client.Send("GET", fmt.Sprintf("/tables/%s/objects/%s/events", t.Name, objectId), nil, &output); err != nil {
 		return nil, err
 	}
 
@@ -181,7 +181,7 @@ func (t *Table) AddEvent(objectId string, event *Event, method string) error {
 	}
 
 	// Serialize data and send to server.
-	return t.client.send(httpMethod, fmt.Sprintf("/tables/%s/objects/%s/events/%s", t.Name, objectId, FormatTimestamp(event.Timestamp)), event.Serialize(), nil)
+	return t.client.Send(httpMethod, fmt.Sprintf("/tables/%s/objects/%s/events/%s", t.Name, objectId, FormatTimestamp(event.Timestamp)), event.Serialize(), nil)
 }
 
 // Deletes an event on the table.
@@ -195,14 +195,15 @@ func (t *Table) DeleteEvent(objectId string, event *Event) error {
 	if event == nil {
 		return errors.New("Event required")
 	}
-	return t.client.send("DELETE", fmt.Sprintf("/tables/%s/objects/%s/events/%s", t.Name, objectId, FormatTimestamp(event.Timestamp)), nil, nil)
+	return t.client.Send("DELETE", fmt.Sprintf("/tables/%s/objects/%s/events/%s", t.Name, objectId, FormatTimestamp(event.Timestamp)), nil, nil)
 }
 
-// Streams
+// Opens a stream to the server and passes the stream to a function for processing.
+// The stream is automatically closed when the function completes.
 func (t *Table) Stream(f func(*EventStream)) error {
 	// Send the HTTP request with the reader.
 	stream := NewEventStream()
-	req, err := http.NewRequest("PATCH", t.client.PathUrl(fmt.Sprintf("/tables/%s/events", t.Name)), stream.reader)
+	req, err := http.NewRequest("PATCH", t.client.URL(fmt.Sprintf("/tables/%s/events", t.Name)), stream.reader)
 	if err != nil {
 		return err
 	}
@@ -211,7 +212,7 @@ func (t *Table) Stream(f func(*EventStream)) error {
 	// Send the request to the server.
 	finished := make(chan interface{})
 	go func() {
-		resp, err := t.client.httpClient.Do(req)
+		resp, err := t.client.HTTPClient().Do(req)
 		if err != nil {
 			finished <- err
 		} else {
@@ -262,7 +263,7 @@ func (t *Table) Stats() (*Stats, error) {
 		return nil, errors.New("Table is not attached to a client")
 	}
 	output := &Stats{}
-	if err := t.client.send("GET", fmt.Sprintf("/tables/%s/stats", t.Name), nil, &output); err != nil {
+	if err := t.client.Send("GET", fmt.Sprintf("/tables/%s/stats", t.Name), nil, &output); err != nil {
 		return nil, err
 	}
 	return output, nil
@@ -277,7 +278,7 @@ func (t *Table) RawQuery(q map[string]interface{}) (map[string]interface{}, erro
 		return nil, errors.New("Query required")
 	}
 	output := map[string]interface{}{}
-	if err := t.client.send("POST", fmt.Sprintf("/tables/%s/query", t.Name), q, &output); err != nil {
+	if err := t.client.Send("POST", fmt.Sprintf("/tables/%s/query", t.Name), q, &output); err != nil {
 		return nil, err
 	}
 	return output, nil

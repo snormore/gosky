@@ -11,7 +11,7 @@ const (
 )
 
 // Setup the test environment.
-func run(t *testing.T, f func(*Client, *Table)) {
+func run(t *testing.T, f func(Client, *Table)) {
 	client := NewClient("localhost")
 	if !client.Ping() {
 		t.Fatalf("Server is not running")
