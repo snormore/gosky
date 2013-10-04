@@ -16,16 +16,16 @@ const (
 // A Client is what communicates with the server.
 type Client interface {
 	// Retrieves a single table from the server.
-	GetTable(name string) (*Table, error)
+	GetTable(name string) (Table, error)
 
 	// Retrieves a list of all tables on the server.
-	GetTables() ([]*Table, error)
+	GetTables() ([]Table, error)
 
 	// Creates a table on the server.
-	CreateTable(table *Table) error
+	CreateTable(table Table) error
 
 	// Deletes a table on the server.
-	DeleteTable(table *Table) error
+	DeleteTable(table Table) error
 	
 	// Checks if the server is currently running and available.
 	Ping() bool
@@ -114,7 +114,7 @@ func (c *client) Send(method string, path string, data interface{}, ret interfac
 	return nil
 }
 
-func (c *client) GetTable(name string) (*Table, error) {
+func (c *client) GetTable(name string) (Table, error) {
 	if name == "" {
 		return nil, errors.New("Table name required")
 	}
@@ -125,28 +125,35 @@ func (c *client) GetTable(name string) (*Table, error) {
 	return table, nil
 }
 
-func (c *client) GetTables() ([]*Table, error) {
-	tables := []*Table{}
+func (c *client) GetTables() ([]Table, error) {
+	// Retrieve an array of table implementations.
+	tables := make([]*table, 0)
 	if err := c.Send("GET", "/tables", nil, &tables); err != nil {
 		return nil, err
 	}
-	return tables, nil
+
+	// Convert to an array of table interfaces.
+	tmp := make([]Table, 0)
+	for _, t := range tables {
+		tmp = append(tmp, t)
+	}
+	return tmp, nil
 }
 
-func (c *client) CreateTable(table *Table) error {
+func (c *client) CreateTable(table Table) error {
 	if table == nil {
 		return errors.New("Table required")
 	}
-	table.client = c
+	table.SetClient(c)
 	return c.Send("POST", "/tables", table, table)
 }
 
-func (c *client) DeleteTable(table *Table) error {
+func (c *client) DeleteTable(table Table) error {
 	if table == nil {
 		return errors.New("Table required")
 	}
-	table.client = c
-	return c.Send("DELETE", fmt.Sprintf("/tables/%s", table.Name), nil, nil)
+	table.SetClient(c)
+	return c.Send("DELETE", fmt.Sprintf("/tables/%s", table.Name()), nil, nil)
 }
 
 func (c *client) Ping() bool {

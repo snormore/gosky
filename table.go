@@ -1,60 +1,98 @@
 package sky
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"time"
 )
 
-//------------------------------------------------------------------------------
-//
-// Globals
-//
-//------------------------------------------------------------------------------
-
 const (
 	Replace = "replace"
 	Merge   = "merge"
 )
 
-//------------------------------------------------------------------------------
-//
-// Typedefs
-//
-//------------------------------------------------------------------------------
-
 // A Table is a container for objects and events.
-type Table struct {
-	client Client
-	Name   string `json:"name"`
+type Table interface {
+	// Retrieves the name of the table.
+	Name() string
+
+	// Retrieves the client associated with the table.
+	Client() Client
+
+	// Sets the client associated with the table.
+	SetClient(client Client)
+
+	// Retrieves a single property from the server.
+	GetProperty(name string) (*Property, error)
+
+	// Retrieves a list of all properties on the table.
+	GetProperties() ([]*Property, error)
+
+	// Creates a property on the table.
+	CreateProperty(property *Property) error
+
+	// Updates a property on the table.
+	UpdateProperty(name string, property *Property) error
+
+	// Deletes a property on the table.
+	DeleteProperty(property *Property) error
+
+
+	// Retrieves a single event for an object.
+	GetEvent(objectId string, timestamp time.Time) (*Event, error)
+
+	// Retrieves a list of all events for an object.
+	GetEvents(objectId string) ([]*Event, error)
+
+	// Adds an event to an object.
+	AddEvent(objectId string, event *Event, method string) error
+
+	// Deletes an event on the table.
+	DeleteEvent(objectId string, event *Event) error
+
+	// Opens a stream to the server and passes the stream to a function for processing.
+	// The stream is automatically closed when the function completes.
+	Stream(f func(*EventStream)) error
+
+	// Retrieves basic stats on the table.
+	Stats() (*Stats, error)
+
+	// Executes a raw query on the table.
+	RawQuery(q map[string]interface{}) (map[string]interface{}, error)
 }
 
-//------------------------------------------------------------------------------
-//
-// Constructor
-//
-//------------------------------------------------------------------------------
+type table struct {
+	client Client
+	name   string `json:"name"`
+}
 
-func NewTable(name string, client Client) *Table {
-	return &Table{
-		Name:   name,
-		client: client,
+// Creates a new table attached to a given client.
+func NewTable(name string, c Client) Table {
+	return &table{
+		name:   name,
+		client: c,
 	}
 }
 
-//------------------------------------------------------------------------------
-//
-// Methods
-//
-//------------------------------------------------------------------------------
+// Retrieves a single property from the server.
+func (t *table) Name() string {
+	return t.name
+}
 
-//--------------------------------------
-// Property API
-//--------------------------------------
+// Retrieves the client associated with the table.
+func (t *table) Client() Client {
+	return t.client
+}
+
+// Retrieves the client associated with the table.
+func (t *table) SetClient(c Client) {
+	t.client = c
+}
 
 // Retrieves a single property from the server.
-func (t *Table) GetProperty(name string) (*Property, error) {
+func (t *table) GetProperty(name string) (*Property, error) {
 	if t.client == nil {
 		return nil, errors.New("Table is not attached to a client")
 	}
@@ -62,37 +100,37 @@ func (t *Table) GetProperty(name string) (*Property, error) {
 		return nil, errors.New("Property name required")
 	}
 	property := &Property{}
-	if err := t.client.Send("GET", fmt.Sprintf("/tables/%s/properties/%s", t.Name, name), nil, property); err != nil {
+	if err := t.client.Send("GET", fmt.Sprintf("/tables/%s/properties/%s", t.name, name), nil, property); err != nil {
 		return nil, err
 	}
 	return property, nil
 }
 
 // Retrieves a list of all properties on the table.
-func (t *Table) GetProperties() ([]*Property, error) {
+func (t *table) GetProperties() ([]*Property, error) {
 	if t.client == nil {
 		return nil, errors.New("Table is not attached to a client")
 	}
 	properties := []*Property{}
-	if err := t.client.Send("GET", fmt.Sprintf("/tables/%s/properties", t.Name), nil, &properties); err != nil {
+	if err := t.client.Send("GET", fmt.Sprintf("/tables/%s/properties", t.name), nil, &properties); err != nil {
 		return nil, err
 	}
 	return properties, nil
 }
 
 // Creates a property on the table.
-func (t *Table) CreateProperty(property *Property) error {
+func (t *table) CreateProperty(property *Property) error {
 	if t.client == nil {
 		return errors.New("Table is not attached to a client")
 	}
 	if property == nil {
 		return errors.New("Property required")
 	}
-	return t.client.Send("POST", fmt.Sprintf("/tables/%s/properties", t.Name), property, property)
+	return t.client.Send("POST", fmt.Sprintf("/tables/%s/properties", t.name), property, property)
 }
 
 // Updates a property on the table.
-func (t *Table) UpdateProperty(name string, property *Property) error {
+func (t *table) UpdateProperty(name string, property *Property) error {
 	if t.client == nil {
 		return errors.New("Table is not attached to a client")
 	}
@@ -102,26 +140,22 @@ func (t *Table) UpdateProperty(name string, property *Property) error {
 	if property == nil {
 		return errors.New("Property required")
 	}
-	return t.client.Send("PATCH", fmt.Sprintf("/tables/%s/properties/%s", t.Name, name), property, property)
+	return t.client.Send("PATCH", fmt.Sprintf("/tables/%s/properties/%s", t.name, name), property, property)
 }
 
 // Deletes a property on the table.
-func (t *Table) DeleteProperty(property *Property) error {
+func (t *table) DeleteProperty(property *Property) error {
 	if t.client == nil {
 		return errors.New("Table is not attached to a client")
 	}
 	if property == nil {
 		return errors.New("Property required")
 	}
-	return t.client.Send("DELETE", fmt.Sprintf("/tables/%s/properties/%s", t.Name, property.Name), nil, nil)
+	return t.client.Send("DELETE", fmt.Sprintf("/tables/%s/properties/%s", t.name, property.Name), nil, nil)
 }
 
-//--------------------------------------
-// Event API
-//--------------------------------------
-
 // Retrieves a single event for an object.
-func (t *Table) GetEvent(objectId string, timestamp time.Time) (*Event, error) {
+func (t *table) GetEvent(objectId string, timestamp time.Time) (*Event, error) {
 	if t.client == nil {
 		return nil, errors.New("Table is not attached to a client")
 	}
@@ -130,7 +164,7 @@ func (t *Table) GetEvent(objectId string, timestamp time.Time) (*Event, error) {
 	}
 
 	e := map[string]interface{}{}
-	if err := t.client.Send("GET", fmt.Sprintf("/tables/%s/objects/%s/events/%s", t.Name, objectId, FormatTimestamp(timestamp)), nil, &e); err != nil {
+	if err := t.client.Send("GET", fmt.Sprintf("/tables/%s/objects/%s/events/%s", t.name, objectId, FormatTimestamp(timestamp)), nil, &e); err != nil {
 		return nil, err
 	}
 
@@ -143,7 +177,7 @@ func (t *Table) GetEvent(objectId string, timestamp time.Time) (*Event, error) {
 }
 
 // Retrieves a list of all events for an object.
-func (t *Table) GetEvents(objectId string) ([]*Event, error) {
+func (t *table) GetEvents(objectId string) ([]*Event, error) {
 	if t.client == nil {
 		return nil, errors.New("Table is not attached to a client")
 	}
@@ -151,7 +185,7 @@ func (t *Table) GetEvents(objectId string) ([]*Event, error) {
 		return nil, errors.New("Object identifier required")
 	}
 	output := make([]map[string]interface{}, 0)
-	if err := t.client.Send("GET", fmt.Sprintf("/tables/%s/objects/%s/events", t.Name, objectId), nil, &output); err != nil {
+	if err := t.client.Send("GET", fmt.Sprintf("/tables/%s/objects/%s/events", t.name, objectId), nil, &output); err != nil {
 		return nil, err
 	}
 
@@ -166,7 +200,7 @@ func (t *Table) GetEvents(objectId string) ([]*Event, error) {
 }
 
 // Adds an event to an object.
-func (t *Table) AddEvent(objectId string, event *Event, method string) error {
+func (t *table) AddEvent(objectId string, event *Event, method string) error {
 	if objectId == "" {
 		return errors.New("Object identifier required")
 	}
@@ -181,11 +215,11 @@ func (t *Table) AddEvent(objectId string, event *Event, method string) error {
 	}
 
 	// Serialize data and send to server.
-	return t.client.Send(httpMethod, fmt.Sprintf("/tables/%s/objects/%s/events/%s", t.Name, objectId, FormatTimestamp(event.Timestamp)), event.Serialize(), nil)
+	return t.client.Send(httpMethod, fmt.Sprintf("/tables/%s/objects/%s/events/%s", t.name, objectId, FormatTimestamp(event.Timestamp)), event.Serialize(), nil)
 }
 
 // Deletes an event on the table.
-func (t *Table) DeleteEvent(objectId string, event *Event) error {
+func (t *table) DeleteEvent(objectId string, event *Event) error {
 	if t.client == nil {
 		return errors.New("Table is not attached to a client")
 	}
@@ -195,15 +229,15 @@ func (t *Table) DeleteEvent(objectId string, event *Event) error {
 	if event == nil {
 		return errors.New("Event required")
 	}
-	return t.client.Send("DELETE", fmt.Sprintf("/tables/%s/objects/%s/events/%s", t.Name, objectId, FormatTimestamp(event.Timestamp)), nil, nil)
+	return t.client.Send("DELETE", fmt.Sprintf("/tables/%s/objects/%s/events/%s", t.name, objectId, FormatTimestamp(event.Timestamp)), nil, nil)
 }
 
 // Opens a stream to the server and passes the stream to a function for processing.
 // The stream is automatically closed when the function completes.
-func (t *Table) Stream(f func(*EventStream)) error {
+func (t *table) Stream(f func(*EventStream)) error {
 	// Send the HTTP request with the reader.
 	stream := NewEventStream()
-	req, err := http.NewRequest("PATCH", t.client.URL(fmt.Sprintf("/tables/%s/events", t.Name)), stream.reader)
+	req, err := http.NewRequest("PATCH", t.client.URL(fmt.Sprintf("/tables/%s/events", t.name)), stream.reader)
 	if err != nil {
 		return err
 	}
@@ -253,24 +287,20 @@ func getInsertHttpMethod(method string) (string, error) {
 	return "", fmt.Errorf("Invalid add event method: %s", method)
 }
 
-//--------------------------------------
-// Query API
-//--------------------------------------
-
 // Retrieves basic stats on the table.
-func (t *Table) Stats() (*Stats, error) {
+func (t *table) Stats() (*Stats, error) {
 	if t.client == nil {
 		return nil, errors.New("Table is not attached to a client")
 	}
 	output := &Stats{}
-	if err := t.client.Send("GET", fmt.Sprintf("/tables/%s/stats", t.Name), nil, &output); err != nil {
+	if err := t.client.Send("GET", fmt.Sprintf("/tables/%s/stats", t.name), nil, &output); err != nil {
 		return nil, err
 	}
 	return output, nil
 }
 
 // Executes a raw query on the table.
-func (t *Table) RawQuery(q map[string]interface{}) (map[string]interface{}, error) {
+func (t *table) RawQuery(q map[string]interface{}) (map[string]interface{}, error) {
 	if t.client == nil {
 		return nil, errors.New("Table is not attached to a client")
 	}
@@ -278,9 +308,22 @@ func (t *Table) RawQuery(q map[string]interface{}) (map[string]interface{}, erro
 		return nil, errors.New("Query required")
 	}
 	output := map[string]interface{}{}
-	if err := t.client.Send("POST", fmt.Sprintf("/tables/%s/query", t.Name), q, &output); err != nil {
+	if err := t.client.Send("POST", fmt.Sprintf("/tables/%s/query", t.name), q, &output); err != nil {
 		return nil, err
 	}
 	return output, nil
 }
 
+func (t *table) MarshalJSON() ([]byte, error) {
+	b, err := json.Marshal(map[string]interface{}{"name":t.name})
+	return b, err
+}
+
+func (t *table) UnmarshalJSON(data []byte) error {
+	tmp := map[string]interface{}{}
+	if err := json.Unmarshal(data, &tmp); err != nil {
+		return err
+	}
+	t.name, _ = tmp["name"].(string)
+	return nil
+}
