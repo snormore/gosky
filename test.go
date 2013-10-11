@@ -12,7 +12,7 @@ const (
 
 // Setup the test environment.
 func run(t *testing.T, f func(Client, Table)) {
-	client := NewClient("localhost")
+	client := NewClientEx("localhost", 8589)
 	if !client.Ping() {
 		t.Fatalf("Server is not running")
 	}
@@ -33,4 +33,3 @@ func run(t *testing.T, f func(Client, Table)) {
 func warn(msg string, v ...interface{}) {
 	fmt.Fprintf(os.Stderr, msg+"\n", v...)
 }
-
