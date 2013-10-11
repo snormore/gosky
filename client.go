@@ -32,7 +32,7 @@ type Client interface {
 
 	// Deletes a table on the server.
 	DeleteTable(table Table) error
-	
+
 	// Checks if the server is currently running and available.
 	Ping() bool
 
@@ -56,6 +56,14 @@ func NewClient(host string) Client {
 	return &client{
 		host:       host,
 		port:       DefaultPort,
+		httpClient: &http.Client{},
+	}
+}
+
+func NewClientEx(host string, port uint) Client {
+	return &client{
+		Host:       host,
+		Port:       port,
 		httpClient: &http.Client{},
 	}
 }
