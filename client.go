@@ -15,6 +15,12 @@ const (
 
 // A Client is what communicates with the server.
 type Client interface {
+	Host() string
+	SetHost(host string)
+
+	Port() uint
+	SetPort(port uint)
+
 	// Retrieves a single table from the server.
 	GetTable(name string) (Table, error)
 
@@ -41,17 +47,37 @@ type Client interface {
 }
 
 type client struct {
-	Host       string
-	Port       uint
+	host       string
+	port       uint
 	httpClient *http.Client
 }
 
 func NewClient(host string) Client {
 	return &client{
-		Host:       host,
-		Port:       DefaultPort,
+		host:       host,
+		port:       DefaultPort,
 		httpClient: &http.Client{},
 	}
+}
+
+// Host retrieves the current host.
+func (c *client) Host() string {
+	return c.host
+}
+
+// SetHost sets the current host.
+func (c *client) SetHost(host string) {
+	c.host = host
+}
+
+// Port retrieves the current port.
+func (c *client) Port() uint {
+	return c.port
+}
+
+// SetPort sets the current port.
+func (c *client) SetPort(port uint) {
+	c.port = port
 }
 
 // The HTTP client.
@@ -61,7 +87,7 @@ func (c *client) HTTPClient() *http.Client {
 
 // Constructs a URL based on the client's host, port and a given path.
 func (c *client) URL(path string) string {
-	return fmt.Sprintf("http://%s:%d%s", c.Host, c.Port, path)
+	return fmt.Sprintf("http://%s:%d%s", c.Host(), c.Port(), path)
 }
 
 // Sends low-level data to and from the server.
