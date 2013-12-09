@@ -27,6 +27,10 @@ type Client interface {
 	// Deletes a table on the server.
 	DeleteTable(table Table) error
 
+	// Opens a stream to the server and passes the stream to a function for processing.
+	// The stream is automatically closed when the function completes.
+	Stream(f func(*EventStream)) error
+
 	// Checks if the server is currently running and available.
 	Ping() bool
 
@@ -167,4 +171,48 @@ func (c *client) DeleteTable(table Table) error {
 func (c *client) Ping() bool {
 	err := c.Send("GET", "/ping", nil, nil)
 	return err == nil
+}
+
+// Opens a stream to the server and passes the stream to a function for processing.
+// The stream is automatically closed when the function completes.
+func (c *client) Stream(f func(*EventStream)) error {
+	// Send the HTTP request with the reader.
+	stream := NewEventStream()
+	req, err := http.NewRequest("PATCH", c.URL("/events"), stream.reader)
+	if err != nil {
+		return err
+	}
+	req.Header.Add("Content-Type", "application/json")
+
+	// Send the request to the server.
+	finished := make(chan interface{})
+	go func() {
+		resp, err := c.HTTPClient().Do(req)
+		if err != nil {
+			finished <- err
+		} else {
+			finished <- resp
+		}
+	}()
+
+	// Yield to processing function.
+	f(stream)
+
+	// Close the stream.
+	stream.writer.Close()
+	ret := <-finished
+	stream.reader.Close()
+
+	// Check if the client errored out and return the error appropriately.
+	if resp, ok := ret.(*http.Response); ok {
+		defer resp.Body.Close()
+
+		if resp.StatusCode != 200 {
+			return fmt.Errorf("Stream error: %d", resp.StatusCode)
+		}
+		return nil
+	} else if err, ok := ret.(error); ok {
+		return err
+	}
+	return nil
 }
