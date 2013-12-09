@@ -2,6 +2,7 @@ package sky
 
 import (
 	"testing"
+	"time"
 )
 
 //--------------------------------------
@@ -28,3 +29,21 @@ func TestGetTables(t *testing.T) {
 	})
 }
 
+func TestEventStream(t *testing.T) {
+	run(t, func(client Client, table Table) {
+		err := client.Stream(func(stream *EventStream) {
+			var data map[string]interface{}
+			now := time.Now()
+			for i := 0; i < 10; i++ {
+				stream.AddTableEvent("xyz", table, NewEvent(now.Add((time.Duration(i)*time.Hour)), data))
+			}
+		})
+		if err != nil {
+			t.Fatalf("Failed to create event stream: (%v)", err)
+		}
+		events, err := table.GetEvents("xyz")
+		if err != nil || len(events) != 10 {
+			t.Fatalf("Failed to get 10 events back: %d events, (%v)", len(events), err)
+		}
+	})
+}
