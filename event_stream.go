@@ -1,9 +1,12 @@
 package sky
 
 import (
+	"bufio"
 	"encoding/json"
 	"errors"
-	"io"
+	"fmt"
+	"net"
+	"net/http"
 )
 
 //------------------------------------------------------------------------------
@@ -15,9 +18,9 @@ import (
 // An event stream maintains an open connection to the database to send events
 // in bulk.
 type EventStream struct {
-	reader  *io.PipeReader
-	writer  *io.PipeWriter
 	encoder *json.Encoder
+	buffer  *bufio.Writer
+	conn    net.Conn
 }
 
 //------------------------------------------------------------------------------
@@ -26,11 +29,32 @@ type EventStream struct {
 //
 //------------------------------------------------------------------------------
 
-func NewEventStream() *EventStream {
+func NewEventStream(c Client, table Table) (*EventStream, error) {
+	header := fmt.Sprintf("PATCH /tables/%s/events HTTP/1.0\r\nHost: %s\r\nContent-Type: application/json\r\nTransfer-Encoding: chunked\r\n\r\n", table.Name(), c.GetHost())
+	return newStream(c, []byte(header))
+}
+
+func NewTableEventStream(c Client) (*EventStream, error) {
+	header := fmt.Sprintf("PATCH /events HTTP/1.0\r\nHost: %s\r\nContent-Type: application/json\r\nTransfer-Encoding: chunked\r\n\r\n", c.GetHost())
+	return newStream(c, []byte(header))
+}
+
+func newStream(c Client, header []byte) (*EventStream, error) {
 	s := &EventStream{}
-	s.reader, s.writer = io.Pipe()
-	s.encoder = json.NewEncoder(s.writer)
-	return s
+	address := fmt.Sprintf("%s:%d", c.GetHost(), c.GetPort())
+	fmt.Println("Connecting: ", address)
+	conn, err := net.Dial("tcp", address)
+	if err != nil {
+		return nil, err
+	}
+	if _, err = conn.Write(header); err != nil {
+		conn.Close()
+		return nil, err
+	}
+	s.conn = conn
+	s.buffer = bufio.NewWriter(conn)
+	s.encoder = json.NewEncoder(s.buffer)
+	return s, nil
 }
 
 //------------------------------------------------------------------------------
@@ -57,7 +81,7 @@ func (s *EventStream) AddEvent(objectId string, event *Event) error {
 	data["id"] = objectId
 
 	// Encode the serialized data into the stream.
-	return s.encoder.Encode(data)
+	return s.sendChunk(data)
 }
 
 func (s *EventStream) AddTableEvent(objectId string, table Table, event *Event) error {
@@ -75,7 +99,48 @@ func (s *EventStream) AddTableEvent(objectId string, table Table, event *Event) 
 	data := event.Serialize()
 	data["id"] = objectId
 	data["table"] = table.Name()
+	return s.sendChunk(data)
+}
 
-	// Encode the serialized data into the stream.
-	return s.encoder.Encode(data)
+func (s *EventStream) sendChunk(data map[string]interface{}) error {
+	fmt.Println("Sending Event : ", data)
+	var err error
+	var size int
+	if data != nil {
+		// Encode the serialized data into the stream.
+		if err = s.encoder.Encode(data); err != nil {
+			return err
+		}
+		size = s.buffer.Buffered()
+	}
+
+	if _, err = fmt.Fprintf(s.conn, "%x\r\n", size); err != nil {
+		return err
+	}
+	if data != nil {
+		if err = s.buffer.Flush(); err != nil {
+			return err
+		}
+	} else {
+		fmt.Println("Closing chunk!")
+	}
+	if _, err = fmt.Fprint(s.conn, "\r\n"); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *EventStream) Close() error {
+	defer s.conn.Close()
+	if err := s.sendChunk(nil); err != nil {
+		fmt.Println("Closing chunk error: ", err)
+		return err
+	}
+	response, err := http.ReadResponse(bufio.NewReader(s.conn), nil)
+	if err != nil {
+		fmt.Println("Response error: ", err)
+		return err
+	}
+	fmt.Println("Stream response: ", response)
+	return nil
 }

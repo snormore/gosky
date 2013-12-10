@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net/http"
 	"time"
 )
 
@@ -39,7 +38,6 @@ type Table interface {
 	// Deletes a property on the table.
 	DeleteProperty(property *Property) error
 
-
 	// Retrieves a single event for an object.
 	GetEvent(objectId string, timestamp time.Time) (*Event, error)
 
@@ -52,9 +50,8 @@ type Table interface {
 	// Deletes an event on the table.
 	DeleteEvent(objectId string, event *Event) error
 
-	// Opens a stream to the server and passes the stream to a function for processing.
-	// The stream is automatically closed when the function completes.
-	Stream(f func(*EventStream)) error
+	// Opens a table specific event stream to the server.
+	Stream() (*EventStream, error)
 
 	// Retrieves basic stats on the table.
 	Stats() (*Stats, error)
@@ -232,48 +229,8 @@ func (t *table) DeleteEvent(objectId string, event *Event) error {
 	return t.client.Send("DELETE", fmt.Sprintf("/tables/%s/objects/%s/events/%s", t.name, objectId, FormatTimestamp(event.Timestamp)), nil, nil)
 }
 
-// Opens a stream to the server and passes the stream to a function for processing.
-// The stream is automatically closed when the function completes.
-func (t *table) Stream(f func(*EventStream)) error {
-	// Send the HTTP request with the reader.
-	stream := NewEventStream()
-	req, err := http.NewRequest("PATCH", t.client.URL(fmt.Sprintf("/tables/%s/events", t.name)), stream.reader)
-	if err != nil {
-		return err
-	}
-	req.Header.Add("Content-Type", "application/json")
-
-	// Send the request to the server.
-	finished := make(chan interface{})
-	go func() {
-		resp, err := t.client.HTTPClient().Do(req)
-		if err != nil {
-			finished <- err
-		} else {
-			finished <- resp
-		}
-	}()
-
-	// Yield to processing function.
-	f(stream)
-
-	// Close the stream.
-	stream.writer.Close()
-	ret := <-finished
-	stream.reader.Close()
-
-	// Check if the client errored out and return the error appropriately.
-	if resp, ok := ret.(*http.Response); ok {
-		defer resp.Body.Close()
-
-		if resp.StatusCode != 200 {
-			return fmt.Errorf("Stream error: %d", resp.StatusCode)
-		}
-		return nil
-	} else if err, ok := ret.(error); ok {
-		return err
-	}
-	return nil
+func (t *table) Stream() (*EventStream, error) {
+	return NewEventStream(t.client, t)
 }
 
 // Determines the appropriate HTTP method to use given an insertion method (Replace, Merge).
@@ -315,7 +272,7 @@ func (t *table) RawQuery(q map[string]interface{}) (map[string]interface{}, erro
 }
 
 func (t *table) MarshalJSON() ([]byte, error) {
-	b, err := json.Marshal(map[string]interface{}{"name":t.name})
+	b, err := json.Marshal(map[string]interface{}{"name": t.name})
 	return b, err
 }
 

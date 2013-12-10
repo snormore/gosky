@@ -29,17 +29,46 @@ func TestGetTables(t *testing.T) {
 	})
 }
 
-func TestEventStream(t *testing.T) {
+func TestTableEventStream(t *testing.T) {
 	run(t, func(client Client, table Table) {
-		err := client.Stream(func(stream *EventStream) {
-			var data map[string]interface{}
-			now := time.Now()
-			for i := 0; i < 10; i++ {
-				stream.AddTableEvent("xyz", table, NewEvent(now.Add((time.Duration(i)*time.Hour)), data))
-			}
-		})
+		stream, err := client.Stream()
 		if err != nil {
 			t.Fatalf("Failed to create event stream: (%v)", err)
+		}
+		defer stream.Close()
+		var data map[string]interface{}
+		now := time.Now()
+		for i := 0; i < 10; i++ {
+			timestamp := now.Add(time.Duration(i) * time.Hour)
+			event := NewEvent(timestamp, data)
+			err = stream.AddTableEvent("xyz", table, event)
+			if err != nil {
+				t.Fatalf("Failed to create event #%d: %v (%v)", i, event, err)
+			}
+		}
+		events, err := table.GetEvents("xyz")
+		if err != nil || len(events) != 10 {
+			t.Fatalf("Failed to get 10 events back: %d events, (%v)", len(events), err)
+		}
+	})
+}
+
+func TestEventStream(t *testing.T) {
+	run(t, func(client Client, table Table) {
+		stream, err := table.Stream()
+		if err != nil {
+			t.Fatalf("Failed to create event stream: (%v)", err)
+		}
+		defer stream.Close()
+		var data map[string]interface{}
+		now := time.Now()
+		for i := 0; i < 10; i++ {
+			timestamp := now.Add(time.Duration(i) * time.Hour)
+			event := NewEvent(timestamp, data)
+			err = stream.AddEvent("xyz", event)
+			if err != nil {
+				t.Fatalf("Failed to create event #%d: %v (%v)", i, event, err)
+			}
 		}
 		events, err := table.GetEvents("xyz")
 		if err != nil || len(events) != 10 {

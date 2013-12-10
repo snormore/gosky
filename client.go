@@ -33,9 +33,8 @@ type Client interface {
 	// Deletes a table on the server.
 	DeleteTable(table Table) error
 
-	// Opens a stream to the server and passes the stream to a function for processing.
-	// The stream is automatically closed when the function completes.
-	Stream(f func(*EventStream)) error
+	// Opens a table agnostic event stream to the server.
+	Stream() (*EventStream, error)
 
 	// Checks if the server is currently running and available.
 	Ping() bool
@@ -48,6 +47,9 @@ type Client interface {
 
 	// The HTTP client used by the client.
 	HTTPClient() *http.Client
+
+	GetHost() string
+	GetPort() uint
 }
 
 type client struct {
@@ -95,6 +97,14 @@ func (c *client) SetPort(port uint) {
 // The HTTP client.
 func (c *client) HTTPClient() *http.Client {
 	return c.httpClient
+}
+
+func (c *client) GetHost() string {
+	return c.Host
+}
+
+func (c *client) GetPort() uint {
+	return c.Port
 }
 
 // Constructs a URL based on the client's host, port and a given path.
@@ -199,46 +209,6 @@ func (c *client) Ping() bool {
 	return err == nil
 }
 
-// Opens a stream to the server and passes the stream to a function for processing.
-// The stream is automatically closed when the function completes.
-func (c *client) Stream(f func(*EventStream)) error {
-	// Send the HTTP request with the reader.
-	stream := NewEventStream()
-	req, err := http.NewRequest("PATCH", c.URL("/events"), stream.reader)
-	if err != nil {
-		return err
-	}
-	req.Header.Add("Content-Type", "application/json")
-
-	// Send the request to the server.
-	finished := make(chan interface{})
-	go func() {
-		resp, err := c.HTTPClient().Do(req)
-		if err != nil {
-			finished <- err
-		} else {
-			finished <- resp
-		}
-	}()
-
-	// Yield to processing function.
-	f(stream)
-
-	// Close the stream.
-	stream.writer.Close()
-	ret := <-finished
-	stream.reader.Close()
-
-	// Check if the client errored out and return the error appropriately.
-	if resp, ok := ret.(*http.Response); ok {
-		defer resp.Body.Close()
-
-		if resp.StatusCode != 200 {
-			return fmt.Errorf("Stream error: %d", resp.StatusCode)
-		}
-		return nil
-	} else if err, ok := ret.(error); ok {
-		return err
-	}
-	return nil
+func (c *client) Stream() (*EventStream, error) {
+	return NewTableEventStream(c)
 }
