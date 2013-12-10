@@ -210,5 +210,5 @@ func (c *client) Ping() bool {
 }
 
 func (c *client) Stream() (*EventStream, error) {
-	return NewTableEventStream(c)
+	return NewEventStream(c)
 }
