@@ -35,7 +35,6 @@ func TestTableEventStream(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed to create event stream: (%v)", err)
 		}
-		defer stream.Close()
 		var data map[string]interface{}
 		now := time.Now()
 		for i := 0; i < 10; i++ {
@@ -46,6 +45,7 @@ func TestTableEventStream(t *testing.T) {
 				t.Fatalf("Failed to create event #%d: %v (%v)", i, event, err)
 			}
 		}
+		stream.Close()
 		events, err := table.GetEvents("xyz")
 		if err != nil || len(events) != 10 {
 			t.Fatalf("Failed to get 10 events back: %d events, (%v)", len(events), err)
@@ -59,7 +59,6 @@ func TestEventStream(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed to create event stream: (%v)", err)
 		}
-		defer stream.Close()
 		var data map[string]interface{}
 		now := time.Now()
 		for i := 0; i < 10; i++ {
@@ -70,6 +69,7 @@ func TestEventStream(t *testing.T) {
 				t.Fatalf("Failed to create event #%d: %v (%v)", i, event, err)
 			}
 		}
+		stream.Close()
 		events, err := table.GetEvents("xyz")
 		if err != nil || len(events) != 10 {
 			t.Fatalf("Failed to get 10 events back: %d events, (%v)", len(events), err)
