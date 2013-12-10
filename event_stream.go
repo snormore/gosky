@@ -42,7 +42,6 @@ func NewTableEventStream(c Client) (*EventStream, error) {
 func newStream(c Client, header []byte) (*EventStream, error) {
 	s := &EventStream{}
 	address := fmt.Sprintf("%s:%d", c.GetHost(), c.GetPort())
-	fmt.Println("Connecting: ", address)
 	conn, err := net.Dial("tcp", address)
 	if err != nil {
 		return nil, err
@@ -103,7 +102,6 @@ func (s *EventStream) AddTableEvent(objectId string, table Table, event *Event) 
 }
 
 func (s *EventStream) sendChunk(data map[string]interface{}) error {
-	fmt.Println("Sending Event : ", data)
 	var err error
 	var size int
 	if data != nil {
@@ -122,7 +120,6 @@ func (s *EventStream) sendChunk(data map[string]interface{}) error {
 			return err
 		}
 	} else {
-		fmt.Println("Closing chunk!")
 	}
 	if _, err = fmt.Fprint(s.conn, "\r\n"); err != nil {
 		return err
@@ -133,14 +130,14 @@ func (s *EventStream) sendChunk(data map[string]interface{}) error {
 func (s *EventStream) Close() error {
 	defer s.conn.Close()
 	if err := s.sendChunk(nil); err != nil {
-		fmt.Println("Closing chunk error: ", err)
 		return err
 	}
 	response, err := http.ReadResponse(bufio.NewReader(s.conn), nil)
 	if err != nil {
-		fmt.Println("Response error: ", err)
 		return err
 	}
-	fmt.Println("Stream response: ", response)
+	if response.StatusCode != 200 {
+		return errors.New(response.Status)
+	}
 	return nil
 }
