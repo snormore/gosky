@@ -99,21 +99,31 @@ func (s *EventStream) AddEvent(objectId string, table Table, event *Event) error
 	data := event.Serialize()
 	data["id"] = objectId
 	data["table"] = table.Name()
+
+	// Encode the serialized data into the stream.
 	return s.encoder.Encode(data)
 }
 
+// Send any buffered events to the server
 func (s *Stream) Flush() error {
 	return s.buffer.Flush()
 }
 
+// Close the event stream
 func (s *Stream) Close() error {
 	defer s.conn.Close()
+
+	// Flush any buffered events
 	if err := s.Flush(); err != nil {
 		return err
 	}
+
+	// Write an empty chunk
 	if _, err := s.chunker.Write([]byte{}); err != nil {
 		return err
 	}
+
+	// Check server response
 	response, err := http.ReadResponse(bufio.NewReader(s.conn), nil)
 	if err != nil {
 		return err
@@ -125,19 +135,29 @@ func (s *Stream) Close() error {
 	return nil
 }
 
+// Attempt to reconnect the event stream with the server
 func (s *Stream) Reconnect() error {
+
+	// Close the existing connection
 	if s.conn != nil {
 		s.conn.Close()
+		s.conn = nil
 	}
+
+	// Open new connection
 	address := fmt.Sprintf("%s:%d", s.client.GetHost(), s.client.GetPort())
 	conn, err := net.Dial("tcp", address)
 	if err != nil {
 		return err
 	}
+
+	// Write the request header (chunked transfer encoding)
 	if _, err = conn.Write(s.header); err != nil {
 		conn.Close()
 		return err
 	}
+
+	// Finish setting up the stream
 	s.conn = conn
 	s.chunker = &chunkWriter{conn}
 	s.buffer = bufio.NewWriter(s.chunker)
@@ -151,9 +171,13 @@ type chunkWriter struct {
 
 func (cw *chunkWriter) Write(p []byte) (int, error) {
 	var err error
+
+	// Emit the chunk header
 	if _, err = fmt.Fprintf(cw.w, "%x\r\n", len(p)); err != nil {
 		return 0, err
 	}
+
+	// Emit the chunk body
 	var total, count int
 	for len(p) > 0 {
 		count, err = cw.w.Write(p)
@@ -166,6 +190,8 @@ func (cw *chunkWriter) Write(p []byte) (int, error) {
 	if err != nil {
 		return total, err
 	}
+
+	// Emit chunk trailer
 	if _, err = fmt.Fprint(cw.w, "\r\n"); err != nil {
 		return total, err
 	}
