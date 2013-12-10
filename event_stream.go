@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 )
@@ -21,6 +22,7 @@ type Stream struct {
 	client  Client
 	header  []byte
 	encoder *json.Encoder
+	chunker *chunkWriter
 	buffer  *bufio.Writer
 	conn    net.Conn
 }
@@ -78,7 +80,7 @@ func (s *TableEventStream) AddEvent(objectId string, event *Event) error {
 	data["id"] = objectId
 
 	// Encode the serialized data into the stream.
-	return s.sendChunk(data)
+	return s.encoder.Encode(data)
 }
 
 // Adds an event to an object.
@@ -97,38 +99,19 @@ func (s *EventStream) AddEvent(objectId string, table Table, event *Event) error
 	data := event.Serialize()
 	data["id"] = objectId
 	data["table"] = table.Name()
-	return s.sendChunk(data)
+	return s.encoder.Encode(data)
 }
 
-func (s *Stream) sendChunk(data map[string]interface{}) error {
-	var err error
-	var size int
-	if data != nil {
-		// Encode the serialized data into the stream.
-		if err = s.encoder.Encode(data); err != nil {
-			return err
-		}
-		size = s.buffer.Buffered()
-	}
-
-	if _, err = fmt.Fprintf(s.conn, "%x\r\n", size); err != nil {
-		return err
-	}
-	if data != nil {
-		if err = s.buffer.Flush(); err != nil {
-			return err
-		}
-	} else {
-	}
-	if _, err = fmt.Fprint(s.conn, "\r\n"); err != nil {
-		return err
-	}
-	return nil
+func (s *Stream) Flush() error {
+	return s.buffer.Flush()
 }
 
 func (s *Stream) Close() error {
 	defer s.conn.Close()
-	if err := s.sendChunk(nil); err != nil {
+	if err := s.Flush(); err != nil {
+		return err
+	}
+	if _, err := s.chunker.Write([]byte{}); err != nil {
 		return err
 	}
 	response, err := http.ReadResponse(bufio.NewReader(s.conn), nil)
@@ -156,7 +139,35 @@ func (s *Stream) Reconnect() error {
 		return err
 	}
 	s.conn = conn
-	s.buffer = bufio.NewWriter(conn)
+	s.chunker = &chunkWriter{conn}
+	s.buffer = bufio.NewWriter(s.chunker)
 	s.encoder = json.NewEncoder(s.buffer)
 	return nil
+}
+
+type chunkWriter struct {
+	w io.Writer
+}
+
+func (cw *chunkWriter) Write(p []byte) (int, error) {
+	var err error
+	if _, err = fmt.Fprintf(cw.w, "%x\r\n", len(p)); err != nil {
+		return 0, err
+	}
+	var total, count int
+	for len(p) > 0 {
+		count, err = cw.w.Write(p)
+		if !(count > 0) {
+			break
+		}
+		p = p[count:]
+		total += count
+	}
+	if err != nil {
+		return total, err
+	}
+	if _, err = fmt.Fprint(cw.w, "\r\n"); err != nil {
+		return total, err
+	}
+	return total, nil
 }
