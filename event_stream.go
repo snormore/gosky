@@ -165,6 +165,7 @@ func (s *Stream) Reconnect() error {
 	return nil
 }
 
+// chunkWriter is an io.Writer that will emit any writes in HTTP chunk format
 type chunkWriter struct {
 	w io.Writer
 }
