@@ -18,6 +18,8 @@ import (
 // An event stream maintains an open connection to the database to send events
 // in bulk.
 type EventStream struct {
+	client  Client
+	header  []byte
 	encoder *json.Encoder
 	buffer  *bufio.Writer
 	conn    net.Conn
@@ -40,20 +42,8 @@ func NewTableEventStream(c Client) (*EventStream, error) {
 }
 
 func newStream(c Client, header []byte) (*EventStream, error) {
-	s := &EventStream{}
-	address := fmt.Sprintf("%s:%d", c.GetHost(), c.GetPort())
-	conn, err := net.Dial("tcp", address)
-	if err != nil {
-		return nil, err
-	}
-	if _, err = conn.Write(header); err != nil {
-		conn.Close()
-		return nil, err
-	}
-	s.conn = conn
-	s.buffer = bufio.NewWriter(conn)
-	s.encoder = json.NewEncoder(s.buffer)
-	return s, nil
+	s := &EventStream{client: c, header: header}
+	return s, s.Reconnect()
 }
 
 //------------------------------------------------------------------------------
@@ -136,8 +126,28 @@ func (s *EventStream) Close() error {
 	if err != nil {
 		return err
 	}
+	response.Body.Close()
 	if response.StatusCode != 200 {
 		return errors.New(response.Status)
 	}
+	return nil
+}
+
+func (s *EventStream) Reconnect() error {
+	if s.conn != nil {
+		s.conn.Close()
+	}
+	address := fmt.Sprintf("%s:%d", s.client.GetHost(), s.client.GetPort())
+	conn, err := net.Dial("tcp", address)
+	if err != nil {
+		return err
+	}
+	if _, err = conn.Write(s.header); err != nil {
+		conn.Close()
+		return err
+	}
+	s.conn = conn
+	s.buffer = bufio.NewWriter(conn)
+	s.encoder = json.NewEncoder(s.buffer)
 	return nil
 }
