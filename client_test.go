@@ -29,7 +29,7 @@ func TestGetTables(t *testing.T) {
 	})
 }
 
-func TestTableEventStream(t *testing.T) {
+func TestEventStream(t *testing.T) {
 	run(t, func(client Client, table Table) {
 		stream, err := client.Stream()
 		if err != nil {
@@ -40,7 +40,7 @@ func TestTableEventStream(t *testing.T) {
 		for i := 0; i < 10; i++ {
 			timestamp := now.Add(time.Duration(i) * time.Hour)
 			event := NewEvent(timestamp, data)
-			err = stream.AddTableEvent("xyz", table, event)
+			err = stream.AddEvent("xyz", table, event)
 			if err != nil {
 				t.Fatalf("Failed to create event #%d: %v (%v)", i, event, err)
 			}
@@ -56,7 +56,7 @@ func TestTableEventStream(t *testing.T) {
 	})
 }
 
-func TestEventStream(t *testing.T) {
+func TestTableEventStream(t *testing.T) {
 	run(t, func(client Client, table Table) {
 		stream, err := table.Stream()
 		if err != nil {

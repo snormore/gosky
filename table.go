@@ -51,7 +51,7 @@ type Table interface {
 	DeleteEvent(objectId string, event *Event) error
 
 	// Opens a table specific event stream to the server.
-	Stream() (*EventStream, error)
+	Stream() (*TableEventStream, error)
 
 	// Retrieves basic stats on the table.
 	Stats() (*Stats, error)
@@ -229,8 +229,8 @@ func (t *table) DeleteEvent(objectId string, event *Event) error {
 	return t.client.Send("DELETE", fmt.Sprintf("/tables/%s/objects/%s/events/%s", t.name, objectId, FormatTimestamp(event.Timestamp)), nil, nil)
 }
 
-func (t *table) Stream() (*EventStream, error) {
-	return NewEventStream(t.client, t)
+func (t *table) Stream() (*TableEventStream, error) {
+	return NewTableEventStream(t.client, t)
 }
 
 // Determines the appropriate HTTP method to use given an insertion method (Replace, Merge).

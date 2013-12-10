@@ -16,13 +16,24 @@ import (
 //------------------------------------------------------------------------------
 
 // An event stream maintains an open connection to the database to send events
-// in bulk.
-type EventStream struct {
+// in bulk. This is the base stream type.
+type Stream struct {
 	client  Client
 	header  []byte
 	encoder *json.Encoder
 	buffer  *bufio.Writer
 	conn    net.Conn
+}
+
+// EventStream is a table-less stream.
+type EventStream struct {
+	*Stream
+}
+
+// TableEventStream is a stream to a specific table.
+type TableEventStream struct {
+	*Stream
+	table Table
 }
 
 //------------------------------------------------------------------------------
@@ -31,18 +42,15 @@ type EventStream struct {
 //
 //------------------------------------------------------------------------------
 
-func NewEventStream(c Client, table Table) (*EventStream, error) {
+func NewTableEventStream(c Client, table Table) (*TableEventStream, error) {
 	header := fmt.Sprintf("PATCH /tables/%s/events HTTP/1.0\r\nHost: %s\r\nContent-Type: application/json\r\nTransfer-Encoding: chunked\r\n\r\n", table.Name(), c.GetHost())
-	return newStream(c, []byte(header))
+	s := &TableEventStream{&Stream{client: c, header: []byte(header)}, table}
+	return s, s.Reconnect()
 }
 
-func NewTableEventStream(c Client) (*EventStream, error) {
+func NewEventStream(c Client) (*EventStream, error) {
 	header := fmt.Sprintf("PATCH /events HTTP/1.0\r\nHost: %s\r\nContent-Type: application/json\r\nTransfer-Encoding: chunked\r\n\r\n", c.GetHost())
-	return newStream(c, []byte(header))
-}
-
-func newStream(c Client, header []byte) (*EventStream, error) {
-	s := &EventStream{client: c, header: header}
+	s := &EventStream{&Stream{client: c, header: []byte(header)}}
 	return s, s.Reconnect()
 }
 
@@ -57,7 +65,7 @@ func newStream(c Client, header []byte) (*EventStream, error) {
 //--------------------------------------
 
 // Adds an event to an object.
-func (s *EventStream) AddEvent(objectId string, event *Event) error {
+func (s *TableEventStream) AddEvent(objectId string, event *Event) error {
 	if objectId == "" {
 		return errors.New("Object identifier required")
 	}
@@ -73,7 +81,8 @@ func (s *EventStream) AddEvent(objectId string, event *Event) error {
 	return s.sendChunk(data)
 }
 
-func (s *EventStream) AddTableEvent(objectId string, table Table, event *Event) error {
+// Adds an event to an object.
+func (s *EventStream) AddEvent(objectId string, table Table, event *Event) error {
 	if objectId == "" {
 		return errors.New("Object identifier required")
 	}
@@ -91,7 +100,7 @@ func (s *EventStream) AddTableEvent(objectId string, table Table, event *Event) 
 	return s.sendChunk(data)
 }
 
-func (s *EventStream) sendChunk(data map[string]interface{}) error {
+func (s *Stream) sendChunk(data map[string]interface{}) error {
 	var err error
 	var size int
 	if data != nil {
@@ -117,7 +126,7 @@ func (s *EventStream) sendChunk(data map[string]interface{}) error {
 	return nil
 }
 
-func (s *EventStream) Close() error {
+func (s *Stream) Close() error {
 	defer s.conn.Close()
 	if err := s.sendChunk(nil); err != nil {
 		return err
@@ -133,7 +142,7 @@ func (s *EventStream) Close() error {
 	return nil
 }
 
-func (s *EventStream) Reconnect() error {
+func (s *Stream) Reconnect() error {
 	if s.conn != nil {
 		s.conn.Close()
 	}
