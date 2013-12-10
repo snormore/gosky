@@ -12,7 +12,7 @@ const (
 
 // Setup the test environment.
 func run(t *testing.T, f func(Client, Table)) {
-	client := NewClientEx("shopify.dev", 8589)
+	client := NewClientEx("localhost", 8589)
 	if !client.Ping() {
 		t.Fatalf("Server is not running")
 	}

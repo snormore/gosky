@@ -45,7 +45,10 @@ func TestTableEventStream(t *testing.T) {
 				t.Fatalf("Failed to create event #%d: %v (%v)", i, event, err)
 			}
 		}
-		stream.Close()
+		err = stream.Close()
+		if err != nil {
+			t.Fatalf("Closing stream failed: (%v)", err)
+		}
 		events, err := table.GetEvents("xyz")
 		if err != nil || len(events) != 10 {
 			t.Fatalf("Failed to get 10 events back: %d events, (%v)", len(events), err)
@@ -69,7 +72,10 @@ func TestEventStream(t *testing.T) {
 				t.Fatalf("Failed to create event #%d: %v (%v)", i, event, err)
 			}
 		}
-		stream.Close()
+		err = stream.Close()
+		if err != nil {
+			t.Fatalf("Closing stream failed: (%v)", err)
+		}
 		events, err := table.GetEvents("xyz")
 		if err != nil || len(events) != 10 {
 			t.Fatalf("Failed to get 10 events back: %d events, (%v)", len(events), err)
