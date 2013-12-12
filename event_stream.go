@@ -84,7 +84,7 @@ func (s *TableEventStream) AddEvent(objectId string, event *Event) error {
 }
 
 // Adds an event to an object.
-func (s *EventStream) AddEvent(objectId string, table Table, event *Event) error {
+func (s *EventStream) AddEvent(table Table, objectId string, event *Event) error {
 	if objectId == "" {
 		return errors.New("Object identifier required")
 	}

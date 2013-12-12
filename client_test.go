@@ -40,7 +40,7 @@ func TestEventStream(t *testing.T) {
 		for i := 0; i < 10; i++ {
 			timestamp := now.Add(time.Duration(i) * time.Hour)
 			event := NewEvent(timestamp, data)
-			err = stream.AddEvent("xyz", table, event)
+			err = stream.AddEvent(table, "xyz", event)
 			if err != nil {
 				t.Fatalf("Failed to create event #%d: %v (%v)", i, event, err)
 			}
