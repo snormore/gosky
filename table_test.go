@@ -67,37 +67,8 @@ func TestGetProperties(t *testing.T) {
 // Event API
 //--------------------------------------
 
-// Ensure that we can replace an event into another one.
-func TestReplaceEvent(t *testing.T) {
-	run(t, func(client Client, table Table) {
-		timestamp, _ := ParseTimestamp("1970-01-01T00:00:01.5Z")
-		table.CreateProperty(NewProperty("p0", false, Factor))
-		table.CreateProperty(NewProperty("t0", true, Integer))
-		e0 := NewEvent(timestamp, map[string]interface{}{"p0": "foo", "t0": 10})
-		e1 := NewEvent(timestamp, map[string]interface{}{"t0": 20})
-
-		// Add the event.
-		err := table.AddEvent("o0", e0, Replace)
-		if err != nil {
-			t.Fatalf("Unable to replace event: %v (%v)", e0, err)
-		}
-
-		// Replace the event.
-		err = table.AddEvent("o0", e1, Replace)
-		if err != nil {
-			t.Fatalf("Unable to replace event: %v (%v)", e1, err)
-		}
-
-		// Get the event to verify.
-		event, err := table.GetEvent("o0", timestamp)
-		if err != nil || event.Data["t0"] != float64(20) || event.Data["p0"] != nil {
-			t.Fatalf("Incorrect replaced event: %v (%v)", event, err)
-		}
-	})
-}
-
-// Ensure that we can merge an event into another one.
-func TestMergeEvent(t *testing.T) {
+// Ensure that we can insert an event and merge an update into it.
+func TestInsertEvent(t *testing.T) {
 	run(t, func(client Client, table Table) {
 		timestamp, _ := ParseTimestamp("1970-01-01T00:00:01.5Z")
 		table.CreateProperty(NewProperty("p0", false, String))
@@ -170,13 +141,13 @@ func TestSimpleCountQuery(t *testing.T) {
 
 		// Run a simple count query.
 		results, err := table.RawQuery(map[string]interface{}{
-			"steps":[]map[string]interface{}{
+			"steps": []map[string]interface{}{
 				map[string]interface{}{
-					"type":"selection",
-					"fields":[]map[string]interface{}{
+					"type": "selection",
+					"fields": []map[string]interface{}{
 						map[string]interface{}{
-							"name":"count",
-							"expression":"count()",
+							"name":       "count",
+							"expression": "count()",
 						},
 					},
 				},

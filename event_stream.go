@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"net/http"
+	"strings"
 )
 
 //------------------------------------------------------------------------------
@@ -123,16 +123,16 @@ func (s *Stream) Close() error {
 		return err
 	}
 
-	// Check server response
-	response, err := http.ReadResponse(bufio.NewReader(s.conn), nil)
+	// Check server response status
+	reader := bufio.NewReader(s.conn)
+	status, err := reader.ReadString('\r')
 	if err != nil {
 		return err
 	}
-	response.Body.Close()
-	if response.StatusCode != 200 {
-		return errors.New(response.Status)
+	if strings.HasPrefix(status, "HTTP/1.0 200") {
+		return nil
 	}
-	return nil
+	return errors.New(status)
 }
 
 // Attempt to reconnect the event stream with the server
