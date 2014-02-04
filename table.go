@@ -50,6 +50,9 @@ type Table interface {
 	// Deletes an event on the table.
 	DeleteEvent(objectId string, event *Event) error
 
+	// Deletes all object events on the table.
+	DeleteEvents(objectId string) error
+
 	// Opens a table specific event stream to the server.
 	Stream() (*TableEventStream, error)
 
