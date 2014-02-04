@@ -229,6 +229,17 @@ func (t *table) DeleteEvent(objectId string, event *Event) error {
 	return t.client.Send("DELETE", fmt.Sprintf("/tables/%s/objects/%s/events/%s", t.name, objectId, FormatTimestamp(event.Timestamp)), nil, nil)
 }
 
+// Deletes all object events on the table.
+func (t *table) DeleteEvents(objectId string) error {
+	if t.client == nil {
+		return errors.New("Table is not attached to a client")
+	}
+	if objectId == "" {
+		return errors.New("Object identifier required")
+	}
+	return t.client.Send("DELETE", fmt.Sprintf("/tables/%s/objects/%s/events", t.name, objectId), nil, nil)
+}
+
 func (t *table) Stream() (*TableEventStream, error) {
 	return NewTableEventStream(t.client, t)
 }
