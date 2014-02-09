@@ -68,8 +68,8 @@ func NewClient(host string) Client {
 
 func NewClientEx(host string, port uint) Client {
 	return &client{
-		Host:       host,
-		Port:       port,
+		host:       host,
+		port:       port,
 		httpClient: &http.Client{},
 	}
 }
@@ -100,11 +100,11 @@ func (c *client) HTTPClient() *http.Client {
 }
 
 func (c *client) GetHost() string {
-	return c.Host
+	return c.host
 }
 
 func (c *client) GetPort() uint {
-	return c.Port
+	return c.port
 }
 
 // Constructs a URL based on the client's host, port and a given path.
